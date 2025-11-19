@@ -1,11 +1,344 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>finance tracker</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Finance Tracker</title>
+  <style>
+    :root{
+      --bg:#f4f7fb; --card:#fff; --accent:#2b8aef; --danger:#ef5350; --muted:#6b7280;
+      --glass: rgba(255,255,255,0.6);
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; background:linear-gradient(180deg,#eef6ff 0%,var(--bg) 100%); color:#0f172a;
+      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+      min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;
+    }
+    .app{
+      width:100%; max-width:1100px; background:var(--card); border-radius:12px; box-shadow:0 6px 30px rgba(15,23,42,0.08);
+      overflow:hidden; display:grid; grid-template-columns:380px 1fr; gap:0;
+    }
+    header{grid-column:1/-1; padding:20px 24px; border-bottom:1px solid #eef2f7; display:flex; align-items:center; justify-content:space-between}
+    header h1{margin:0; font-size:18px; letter-spacing:0.2px}
+    .left{padding:20px; background:linear-gradient(180deg,rgba(43,138,239,0.06),transparent); min-height:460px}
+    .summary{display:flex; gap:12px; margin-bottom:18px}
+    .card{flex:1; background:var(--glass); padding:12px; border-radius:10px; border:1px solid rgba(43,138,239,0.06)}
+    .card h3{margin:0; font-size:12px; color:var(--muted)}
+    .card p{margin:8px 0 0; font-weight:600; font-size:18px}
+    form{display:flex; flex-direction:column; gap:10px}
+    label{font-size:13px; color:var(--muted)}
+    input[type="text"], input[type="number"], input[type="date"], select{
+      padding:10px; border-radius:8px; border:1px solid #e6eefc; background:#fff; outline:none;
+    }
+    .row{display:flex; gap:10px}
+    .btn{background:var(--accent); color:#fff; border:none; padding:10px 12px; border-radius:8px; cursor:pointer}
+    .btn.ghost{background:transparent; color:var(--accent); border:1px solid rgba(43,138,239,0.12)}
+    .right{padding:20px}
+    .controls{display:flex; gap:8px; align-items:center; margin-bottom:12px}
+    .transactions{background:linear-gradient(180deg, #fff, #fcfdfe); padding:14px; border-radius:10px; max-height:420px; overflow:auto; border:1px solid #eef2f7}
+    .tx{display:flex; justify-content:space-between; align-items:center; padding:8px 6px; border-bottom:1px dashed #f1f5f9}
+    .tx:last-child{border-bottom:0}
+    .tx .meta{display:flex; gap:10px; align-items:center}
+    .amount{font-weight:700}
+    .amount.negative{color:var(--danger)}
+    canvas{width:100%; height:160px; display:block; background:linear-gradient(180deg,#fff, #fbfdff); border-radius:8px}
+    footer{padding:12px 20px; border-top:1px solid #eef2f7; display:flex; justify-content:space-between; align-items:center; font-size:13px}
+    @media (max-width:880px){
+      .app{grid-template-columns:1fr; max-width:720px}
+      .left{order:2}
+      .right{order:1}
+      header{flex-direction:column; gap:8px; align-items:flex-start}
+    }
+  </style>
 </head>
 <body>
-    finace tracker
+  <div class="app" role="application" aria-label="Finance tracker">
+    <header>
+      <h1>Finance Tracker</h1>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button id="exportBtn" class="btn ghost" title="Export CSV">Export CSV</button>
+        <button id="clearBtn" class="btn" title="Clear all">Clear</button>
+      </div>
+    </header>
+
+    <aside class="left">
+      <div class="summary" aria-hidden>
+        <div class="card">
+          <h3>Balance</h3>
+          <p id="balance">$0.00</p>
+        </div>
+        <div class="card">
+          <h3>Income</h3>
+          <p id="income">$0.00</p>
+        </div>
+        <div class="card">
+          <h3>Expense</h3>
+          <p id="expense">$0.00</p>
+        </div>
+      </div>
+
+      <form id="txForm" aria-label="Add transaction">
+        <label for="description">Description</label>
+        <input id="description" type="text" placeholder="e.g., Salary, Rent" required />
+
+        <div class="row">
+          <div style="flex:1">
+            <label for="amount">Amount (use negative for expense)</label>
+            <input id="amount" type="number" step="0.01" placeholder="100.00" required />
+          </div>
+          <div style="width:140px">
+            <label for="date">Date</label>
+            <input id="date" type="date" />
+          </div>
+        </div>
+
+        <label for="category">Category</label>
+        <select id="category">
+          <option value="other">Other</option>
+          <option value="salary">Salary</option>
+          <option value="food">Food</option>
+          <option value="rent">Rent</option>
+          <option value="transport">Transport</option>
+        </select>
+
+        <div style="display:flex; gap:8px; margin-top:8px">
+          <button class="btn" type="submit">Add Transaction</button>
+          <button id="quickIncome" type="button" class="btn ghost">Quick +100</button>
+          <button id="quickExpense" type="button" class="btn ghost">Quick -20</button>
+        </div>
+      </form>
+    </aside>
+
+    <main class="right">
+      <div class="controls">
+        <input id="search" type="text" placeholder="Search description or category" style="flex:1; padding:8px; border-radius:8px; border:1px solid #e6eefc" />
+        <select id="filter">
+          <option value="all">All</option>
+          <option value="income">Income</option>
+          <option value="expense">Expense</option>
+        </select>
+      </div>
+
+      <div style="display:flex; gap:12px; margin-bottom:12px; align-items:center;">
+        <canvas id="chart" width="600" height="160"></canvas>
+      </div>
+
+      <div class="transactions" id="txList" aria-live="polite"></div>
+    </main>
+
+    <footer>
+      <div>Local data — persists in this browser.</div>
+      <div style="color:var(--muted)">Tip: use negative amounts for expenses</div>
+    </footer>
+  </div>
+
+  <script>
+    // Simple finance tracker with localStorage
+    const STORAGE_KEY = 'ft_transactions_v1';
+    const form = document.getElementById('txForm');
+    const desc = document.getElementById('description');
+    const amountEl = document.getElementById('amount');
+    const dateEl = document.getElementById('date');
+    const categoryEl = document.getElementById('category');
+    const txList = document.getElementById('txList');
+    const balanceEl = document.getElementById('balance');
+    const incomeEl = document.getElementById('income');
+    const expenseEl = document.getElementById('expense');
+    const search = document.getElementById('search');
+    const filter = document.getElementById('filter');
+    const clearBtn = document.getElementById('clearBtn');
+    const exportBtn = document.getElementById('exportBtn');
+    const quickIncome = document.getElementById('quickIncome');
+    const quickExpense = document.getElementById('quickExpense');
+    const chart = document.getElementById('chart');
+    const ctx = chart.getContext('2d');
+
+    let transactions = load();
+
+    function load(){
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if(!raw) return defaultData();
+        return JSON.parse(raw) || [];
+      } catch(e){
+        console.error(e);
+        return defaultData();
+      }
+    }
+    function defaultData(){
+      return [
+        {id: id(), description: 'Initial balance', amount: 500, date: new Date().toISOString().slice(0,10), category: 'salary'}
+      ];
+    }
+    function save(){
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
+      render();
+    }
+    function id(){ return Math.random().toString(36).slice(2,9) }
+
+    function addTransaction(tx){
+      transactions.unshift(tx);
+      save();
+    }
+    function removeTransaction(idv){
+      transactions = transactions.filter(t => t.id !== idv);
+      save();
+    }
+
+    function formatCurrency(n){
+      const sign = n < 0 ? '-' : '';
+      return sign + '$' + Math.abs(n).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+    }
+
+    function summarize(list){
+      const income = list.filter(t=>t.amount>0).reduce((s,t)=>s+t.amount,0);
+      const expense = list.filter(t=>t.amount<0).reduce((s,t)=>s+t.amount,0);
+      return {income, expense, balance: income + expense};
+    }
+
+    function render(){
+      const q = search.value.trim().toLowerCase();
+      const f = filter.value;
+      let list = transactions.slice();
+      if(f === 'income') list = list.filter(t=>t.amount>0);
+      if(f === 'expense') list = list.filter(t=>t.amount<0);
+      if(q) list = list.filter(t=> (t.description + ' ' + t.category).toLowerCase().includes(q));
+
+      // summary
+      const s = summarize(transactions);
+      balanceEl.textContent = formatCurrency(s.balance);
+      incomeEl.textContent = formatCurrency(s.income);
+      expenseEl.textContent = formatCurrency(s.expense);
+
+      // transactions list
+      txList.innerHTML = '';
+      if(list.length === 0){
+        txList.innerHTML = '<div style="padding:18px;color:var(--muted)">No transactions</div>';
+      } else {
+        for(const t of list){
+          const el = document.createElement('div');
+          el.className = 'tx';
+          el.innerHTML = `
+            <div class="meta">
+              <div style="width:8px;height:40px;border-radius:4px;background:${t.amount>0?'#06d6a0':'#ff7b7b'}"></div>
+              <div>
+                <div style="font-weight:600">${escapeHtml(t.description)}</div>
+                <div style="font-size:12px;color:var(--muted)">${t.category} • ${t.date}</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <div class="amount ${t.amount<0?'negative':''}">${formatCurrency(t.amount)}</div>
+              <button data-id="${t.id}" aria-label="remove" style="border:none;background:transparent;color:var(--muted);cursor:pointer">✕</button>
+            </div>
+          `;
+          txList.appendChild(el);
+          el.querySelector('button')?.addEventListener('click', ()=> removeTransaction(t.id));
+        }
+      }
+
+      drawChart(transactions);
+    }
+
+    function escapeHtml(s){
+      return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    form.addEventListener('submit', (e)=>{
+      e.preventDefault();
+      const a = parseFloat(amountEl.value);
+      if(Number.isNaN(a) || !desc.value.trim()) return;
+      const tx = {
+        id: id(),
+        description: desc.value.trim(),
+        amount: Math.round(a*100)/100,
+        date: dateEl.value || new Date().toISOString().slice(0,10),
+        category: categoryEl.value || 'other'
+      };
+      addTransaction(tx);
+      form.reset();
+      dateEl.value = '';
+      desc.focus();
+    });
+
+    quickIncome.addEventListener('click', ()=> addTransaction({id:id(), description:'Quick income', amount:100, date:new Date().toISOString().slice(0,10), category:'salary'}));
+    quickExpense.addEventListener('click', ()=> addTransaction({id:id(), description:'Quick expense', amount:-20, date:new Date().toISOString().slice(0,10), category:'food'}));
+
+    search.addEventListener('input', () => render());
+    filter.addEventListener('change', () => render());
+
+    clearBtn.addEventListener('click', () => {
+      if(!confirm('Clear all transactions? This cannot be undone.')) return;
+      transactions = [];
+      save();
+    });
+
+    exportBtn.addEventListener('click', () => {
+      if(transactions.length === 0){ alert('No transactions to export'); return; }
+      const rows = [['id','date','description','category','amount']];
+      for(const t of transactions) rows.push([t.id,t.date, t.description.replaceAll(',', ' '), t.category, t.amount]);
+      const csv = rows.map(r => r.join(',')).join('\n');
+      const blob = new Blob([csv], {type:'text/csv'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'transactions.csv'; a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    // Chart: monthly totals for last 6 months
+    function drawChart(data){
+      const now = new Date();
+      const months = [];
+      for(let i=5;i>=0;i--){
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        months.push({label: d.toLocaleString(undefined,{month:'short'}), year:d.getFullYear(), month:d.getMonth(), total:0});
+      }
+      for(const t of data){
+        const td = new Date(t.date);
+        for(const m of months){
+          if(td.getFullYear() === m.year && td.getMonth() === m.month){
+            m.total += t.amount;
+            break;
+          }
+        }
+      }
+      // draw
+      const w = chart.width = chart.clientWidth * devicePixelRatio;
+      const h = chart.height = chart.clientHeight * devicePixelRatio;
+      ctx.clearRect(0,0,w,h);
+      ctx.scale(devicePixelRatio, devicePixelRatio);
+      const pad = 12;
+      const cw = chart.clientWidth;
+      const ch = chart.clientHeight;
+      const max = Math.max(...months.map(m=>Math.abs(m.total)), 10);
+      const barW = (cw - pad*2) / months.length - 12;
+      months.forEach((m,i)=>{
+        const x = pad + i*(barW + 12);
+        const yZero = pad + (ch - pad*2)/2;
+        const val = m.total;
+        const barH = Math.max(6, (Math.abs(val)/max) * ((ch - 2*pad)/2));
+        ctx.fillStyle = val>=0 ? '#06d6a0' : '#ff7b7b';
+        if(val>=0){
+          ctx.fillRect(x, yZero - barH, barW, barH);
+        } else {
+          ctx.fillRect(x, yZero, barW, barH);
+        }
+        ctx.fillStyle = '#0f172a'; ctx.font = '12px system-ui';
+        ctx.fillText(m.label, x, ch - 6);
+      });
+      // draw center line
+      ctx.strokeStyle = '#e6eefc'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(pad, pad + (ch - pad*2)/2); ctx.lineTo(cw - pad, pad + (ch - pad*2)/2); ctx.stroke();
+      ctx.setTransform(1,0,0,1,0,0); // reset scale
+    }
+
+    // initial render
+    render();
+
+    // responsive redraw
+    let resizeTimer;
+    window.addEventListener('resize', ()=>{ clearTimeout(resizeTimer); resizeTimer = setTimeout(()=> drawChart(transactions),120) });
+  </script>
 </body>
 </html>
